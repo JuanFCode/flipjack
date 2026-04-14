@@ -1,0 +1,2005 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlipJack — Contador de Cartas Blackjack</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,400&family=Rajdhani:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --felt: #0a3d25;
+      --felt2: #0d4a2e;
+      --felt3: #0f5535;
+      --gold: #c9a84c;
+      --gold-l: #e8d080;
+      --gold-d: #8a6e2a;
+      --white: #f5f0e8;
+      --red-card: #c0392b;
+      --black-card: #1a1a1a;
+      --ah: #f5f0e8;      /* hit */
+      --ah-t: #111;
+      --as: #c0392b;      /* stand */
+      --as-t: #fff;
+      --ad: #1e8449;      /* double */
+      --ad-t: #fff;
+      --asp: #d4ac0d;     /* split */
+      --asp-t: #111;
+      --asur: #1a5276;    /* surrender */
+      --asur-t: #fff;
+    }
+
+    body {
+      font-family: 'Rajdhani', sans-serif;
+      background: var(--felt);
+      background-image:
+        radial-gradient(ellipse 80% 60% at 50% 0%, rgba(15,85,53,0.6) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 40% at 10% 80%, rgba(12,60,38,0.4) 0%, transparent 60%),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect width='6' height='6' fill='%230a3d25'/%3E%3Ccircle cx='1' cy='1' r='0.5' fill='%230c4228' opacity='0.6'/%3E%3Ccircle cx='4' cy='4' r='0.5' fill='%230c4228' opacity='0.6'/%3E%3C/svg%3E");
+      color: var(--white);
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ── */
+    header {
+      text-align: center;
+      padding: 1.2rem 1rem 0.8rem;
+      border-bottom: 1px solid rgba(201,168,76,0.25);
+      background: rgba(0,0,0,0.2);
+    }
+    .logo {
+      font-family: 'Playfair Display', serif;
+      font-size: 2.6rem;
+      font-weight: 900;
+      font-style: italic;
+      color: var(--gold);
+      letter-spacing: -1px;
+      text-shadow: 0 2px 12px rgba(0,0,0,0.6), 0 0 40px rgba(201,168,76,0.4);
+    }
+    .tagline {
+      font-size: 0.72rem;
+      letter-spacing: 3.5px;
+      text-transform: uppercase;
+      color: rgba(201,168,76,0.55);
+      margin-top: 0.15rem;
+    }
+
+    /* ── TABS ── */
+    .tabs {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.9rem 1rem;
+      border-bottom: 1px solid rgba(201,168,76,0.15);
+    }
+    .tab-btn {
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 0.85rem;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      padding: 0.55rem 1.8rem;
+      border: 1px solid var(--gold-d);
+      background: transparent;
+      color: rgba(201,168,76,0.55);
+      cursor: pointer;
+      border-radius: 3px;
+      transition: all 0.2s;
+    }
+    .tab-btn:hover { background: rgba(201,168,76,0.1); color: var(--gold); }
+    .tab-btn.active { background: var(--gold); color: #111; border-color: var(--gold); }
+
+    /* ── COUNTER TAB ── */
+    #counter-section {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto auto auto;
+      gap: 1.2rem;
+    }
+    @media (max-width: 700px) {
+      #counter-section { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(201,168,76,0.18);
+      border-radius: 8px;
+      padding: 1.2rem;
+    }
+    .panel-title {
+      font-size: 0.7rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--gold-d);
+      margin-bottom: 0.9rem;
+      font-weight: 700;
+    }
+
+    /* Card display */
+    .card-area {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+    .card-stage {
+      perspective: 900px;
+      width: 150px;
+      height: 210px;
+    }
+    .card-stage-shadow {
+      filter: drop-shadow(0 10px 28px rgba(0,0,0,0.7));
+    }
+    .playing-card {
+      width: 150px;
+      height: 210px;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.55s cubic-bezier(0.45,0.05,0.55,0.95);
+    }
+    .playing-card.revealed { transform: rotateY(180deg); }
+
+    .card-face, .card-back-face {
+      position: absolute;
+      inset: 0;
+      border-radius: 10px;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+    .card-face {
+      background: #fff;
+      transform: rotateY(180deg);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 8px 10px;
+      border: 1px solid #ddd;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05);
+    }
+    .card-rank-top { font-size: 1.4rem; font-weight: 900; line-height: 1; font-family: 'DM Mono', monospace; }
+    .card-rank-bot { font-size: 1.4rem; font-weight: 900; line-height: 1; transform: rotate(180deg); font-family: 'DM Mono', monospace; align-self: flex-end; }
+    .card-suit-center { font-size: 3.8rem; text-align: center; line-height: 1; }
+    .card-face.red .card-rank-top,
+    .card-face.red .card-rank-bot,
+    .card-face.red .card-suit-center { color: var(--red-card); }
+    .card-face.black .card-rank-top,
+    .card-face.black .card-rank-bot,
+    .card-face.black .card-suit-center { color: var(--black-card); }
+
+    .card-back-face {
+      background: linear-gradient(135deg, #1a2e4a 0%, #0d1f33 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid var(--gold-d);
+    }
+    .card-back-pattern {
+      width: calc(100% - 14px);
+      height: calc(100% - 14px);
+      border: 1px solid rgba(201,168,76,0.4);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: repeating-linear-gradient(
+        45deg,
+        rgba(201,168,76,0.05) 0px, rgba(201,168,76,0.05) 2px,
+        transparent 2px, transparent 8px
+      );
+    }
+    .card-back-logo {
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
+      font-weight: 900;
+      font-size: 1.6rem;
+      color: rgba(201,168,76,0.5);
+    }
+
+    /* Hi-Lo badge */
+    .hilo-badge {
+      font-family: 'DM Mono', monospace;
+      font-size: 1.4rem;
+      font-weight: 700;
+      padding: 0.4rem 1.4rem;
+      border-radius: 6px;
+      letter-spacing: 2px;
+      min-width: 90px;
+      text-align: center;
+      transition: all 0.3s;
+    }
+    .hilo-badge.plus  { background: rgba(30,132,73,0.3); color: #2ecc71; border: 1px solid #1e8449; }
+    .hilo-badge.minus { background: rgba(192,57,43,0.3); color: #e74c3c; border: 1px solid #c0392b; }
+    .hilo-badge.zero  { background: rgba(255,255,255,0.1); color: #bbb; border: 1px solid rgba(255,255,255,0.2); }
+
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.8rem;
+    }
+    .stat-box {
+      background: rgba(0,0,0,0.2);
+      border: 1px solid rgba(201,168,76,0.12);
+      border-radius: 6px;
+      padding: 0.7rem;
+      text-align: center;
+    }
+    .stat-label {
+      font-size: 0.65rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: rgba(201,168,76,0.5);
+      margin-bottom: 0.3rem;
+    }
+    .stat-value {
+      font-family: 'DM Mono', monospace;
+      font-size: 1.6rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .stat-value.positive { color: #2ecc71; }
+    .stat-value.negative { color: #e74c3c; }
+    .stat-value.neutral  { color: var(--white); }
+    .stat-value.gold     { color: var(--gold); }
+
+    /* Betting recommendation */
+    .bet-box {
+      text-align: center;
+      padding: 0.9rem;
+      border-radius: 6px;
+      border: 1px solid;
+      transition: all 0.3s;
+    }
+    .bet-label { font-size: 0.65rem; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 0.4rem; opacity: 0.8; }
+    .bet-amount { font-family: 'Playfair Display', serif; font-size: 1.5rem; font-weight: 700; }
+    .bet-min  { background: rgba(192,57,43,0.15); border-color: rgba(192,57,43,0.4); color: #e74c3c; }
+    .bet-1x   { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); color: var(--white); }
+    .bet-2x   { background: rgba(230,182,0,0.12); border-color: rgba(230,182,0,0.35); color: #f1c40f; }
+    .bet-4x   { background: rgba(30,132,73,0.15); border-color: rgba(30,132,73,0.4); color: #2ecc71; }
+    .bet-8x   { background: rgba(52,152,219,0.15); border-color: rgba(52,152,219,0.4); color: #5dade2; }
+
+    /* Progress bar */
+    .progress-wrap {
+      background: rgba(0,0,0,0.3);
+      border-radius: 4px;
+      height: 10px;
+      overflow: hidden;
+      margin: 0.4rem 0;
+    }
+    .progress-bar {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.4s ease, background-color 0.4s ease;
+    }
+    .progress-info {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      color: rgba(201,168,76,0.6);
+      letter-spacing: 1px;
+      margin-top: 0.25rem;
+    }
+
+    /* Deck selector */
+    .deck-btns {
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+    }
+    .deck-btn {
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 0.8rem;
+      padding: 0.35rem 0.9rem;
+      border: 1px solid var(--gold-d);
+      background: transparent;
+      color: rgba(201,168,76,0.6);
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.2s;
+      letter-spacing: 1px;
+    }
+    .deck-btn:hover { background: rgba(201,168,76,0.15); color: var(--gold); }
+    .deck-btn.active { background: rgba(201,168,76,0.25); color: var(--gold); border-color: var(--gold); }
+
+    /* Action buttons */
+    .action-btns {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .btn {
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 0.85rem;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 0.6rem 1.2rem;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex: 1;
+    }
+    .btn-primary { background: var(--gold); color: #111; }
+    .btn-primary:hover { background: var(--gold-l); }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-secondary { background: rgba(255,255,255,0.12); color: var(--white); }
+    .btn-secondary:hover { background: rgba(255,255,255,0.2); }
+    .btn-secondary.active { background: rgba(46,204,113,0.3); color: #2ecc71; border: 1px solid #1e8449; }
+    .btn-danger { background: rgba(192,57,43,0.25); color: #e74c3c; border: 1px solid rgba(192,57,43,0.4); }
+    .btn-danger:hover { background: rgba(192,57,43,0.4); }
+
+    /* Speed control */
+    .speed-wrap { display: flex; align-items: center; gap: 0.8rem; }
+    .speed-label { font-size: 0.7rem; letter-spacing: 2px; text-transform: uppercase; color: rgba(201,168,76,0.5); white-space: nowrap; }
+    input[type=range] {
+      flex: 1; accent-color: var(--gold);
+      cursor: pointer;
+    }
+
+    /* Card history */
+    .history-row {
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .mini-card {
+      width: 38px;
+      height: 52px;
+      background: #fff;
+      border-radius: 5px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-family: 'DM Mono', monospace;
+      font-weight: 700;
+      border: 1px solid #ddd;
+      position: relative;
+      flex-shrink: 0;
+    }
+    .mini-card .mc-rank { font-size: 0.85rem; line-height: 1; }
+    .mini-card .mc-suit { font-size: 1rem; line-height: 1; }
+    .mini-card.red .mc-rank, .mini-card.red .mc-suit { color: var(--red-card); }
+    .mini-card.black .mc-rank, .mini-card.black .mc-suit { color: var(--black-card); }
+    .mini-badge {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      font-size: 0.55rem;
+      font-family: 'DM Mono', monospace;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(0,0,0,0.3);
+    }
+    .mini-badge.plus  { background: #2ecc71; color: #fff; }
+    .mini-badge.minus { background: #e74c3c; color: #fff; }
+    .mini-badge.zero  { background: #888; color: #fff; }
+
+    /* Hi-Lo legend */
+    .legend-row {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .legend-dot {
+      width: 26px;
+      height: 26px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+    .legend-dot.plus  { background: rgba(46,204,113,0.25); color: #2ecc71; border: 1px solid #1e8449; }
+    .legend-dot.zero  { background: rgba(255,255,255,0.1); color: #bbb; border: 1px solid rgba(255,255,255,0.15); }
+    .legend-dot.minus { background: rgba(231,76,60,0.25); color: #e74c3c; border: 1px solid #c0392b; }
+    .legend-text { font-size: 0.82rem; color: rgba(245,240,232,0.7); }
+
+    /* Grid layout for counter */
+    .card-panel { grid-column: 1; grid-row: 1; }
+    .stats-panel { grid-column: 2; grid-row: 1; }
+    .controls-panel { grid-column: 1 / -1; grid-row: 2; }
+    .history-panel { grid-column: 1 / -1; grid-row: 3; }
+    @media (max-width: 700px) {
+      .card-panel, .stats-panel, .controls-panel, .history-panel { grid-column: 1; }
+      .stats-panel { grid-row: 2; }
+      .controls-panel { grid-row: 3; }
+      .history-panel { grid-row: 4; }
+    }
+
+    /* ── STRATEGY TAB ── */
+    #strategy-section {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem;
+    }
+
+    .strategy-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-bottom: 1.2rem;
+      align-items: center;
+    }
+    .filter-btn {
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 0.8rem;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 0.45rem 1.1rem;
+      border: 1px solid var(--gold-d);
+      background: transparent;
+      color: rgba(201,168,76,0.6);
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+    .filter-btn:hover { background: rgba(201,168,76,0.1); color: var(--gold); }
+    .filter-btn.active { background: rgba(201,168,76,0.2); color: var(--gold); border-color: var(--gold); }
+    .quiz-toggle {
+      margin-left: auto;
+      background: rgba(52,152,219,0.2);
+      border: 1px solid rgba(52,152,219,0.4);
+      color: #5dade2;
+    }
+    .quiz-toggle.active {
+      background: rgba(52,152,219,0.35);
+      color: #85c1e9;
+      border-color: #5dade2;
+    }
+
+    .strategy-table-wrap {
+      overflow-x: auto;
+      border-radius: 8px;
+      border: 1px solid rgba(201,168,76,0.2);
+      background: rgba(0,0,0,0.25);
+    }
+    table {
+      border-collapse: collapse;
+      min-width: 580px;
+      width: 100%;
+    }
+    th {
+      background: rgba(0,0,0,0.4);
+      color: var(--gold);
+      font-size: 0.72rem;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 0.6rem 0.5rem;
+      text-align: center;
+      font-weight: 700;
+      font-family: 'Rajdhani', sans-serif;
+      white-space: nowrap;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      border-bottom: 1px solid rgba(201,168,76,0.25);
+    }
+    th.hand-col {
+      background: rgba(0,0,0,0.5);
+      border-right: 1px solid rgba(201,168,76,0.25);
+      text-align: left;
+      padding-left: 0.9rem;
+      left: 0;
+      z-index: 3;
+    }
+    td {
+      text-align: center;
+      padding: 0.38rem 0.45rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+      font-family: 'Rajdhani', sans-serif;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: filter 0.15s, transform 0.15s;
+      border: 1px solid rgba(0,0,0,0.15);
+    }
+    td:hover { filter: brightness(1.3); transform: scale(1.05); z-index: 1; position: relative; }
+    td.highlighted { outline: 3px solid #fff; outline-offset: -2px; z-index: 1; position: relative; }
+    td.hand-name {
+      background: rgba(0,0,0,0.3);
+      color: var(--gold-l);
+      text-align: left;
+      padding-left: 0.9rem;
+      position: sticky;
+      left: 0;
+      font-size: 0.78rem;
+      border-right: 1px solid rgba(201,168,76,0.2);
+      cursor: default;
+    }
+    td.hand-name:hover { filter: none; transform: none; }
+    .section-header td {
+      background: rgba(201,168,76,0.08);
+      color: rgba(201,168,76,0.7);
+      font-size: 0.65rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      padding: 0.35rem 0.5rem;
+      border-bottom: 1px solid rgba(201,168,76,0.2);
+    }
+    .section-header td.hand-name { background: rgba(201,168,76,0.08); }
+
+    /* Action cell colors */
+    .action-H   { background: var(--ah);   color: var(--ah-t);  }
+    .action-S   { background: var(--as);   color: var(--as-t);  }
+    .action-D   { background: var(--ad);   color: var(--ad-t);  }
+    .action-SP  { background: var(--asp);  color: var(--asp-t); }
+    .action-SUR { background: var(--asur); color: var(--asur-t); font-size: 0.62rem; }
+
+    /* Strategy legend */
+    .strategy-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.8rem;
+      margin-top: 1rem;
+      padding: 0.9rem;
+      background: rgba(0,0,0,0.2);
+      border: 1px solid rgba(201,168,76,0.15);
+      border-radius: 6px;
+    }
+    .sleg-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .sleg-dot {
+      width: 36px;
+      height: 24px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      font-family: 'Rajdhani', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      letter-spacing: 0.5px;
+    }
+    .sleg-text { font-size: 0.78rem; color: rgba(245,240,232,0.75); }
+
+    /* ── QUIZ SECTION ── */
+    #quiz-section {
+      margin-top: 1.2rem;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(52,152,219,0.3);
+      border-radius: 8px;
+      padding: 1.5rem;
+    }
+    .quiz-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.2rem;
+      color: var(--gold);
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+    .quiz-scenario {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 2rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .quiz-card-group { text-align: center; }
+    .quiz-card-label { font-size: 0.65rem; letter-spacing: 2.5px; text-transform: uppercase; color: rgba(201,168,76,0.5); margin-bottom: 0.5rem; }
+    .quiz-cards { display: flex; gap: 0.5rem; justify-content: center; }
+
+    .quiz-mini-card {
+      width: 54px;
+      height: 76px;
+      background: #fff;
+      border-radius: 7px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #ccc;
+      filter: drop-shadow(0 3px 10px rgba(0,0,0,0.5));
+    }
+    .quiz-mini-card .qmc-rank { font-size: 1rem; font-weight: 900; font-family: 'DM Mono', monospace; line-height: 1; }
+    .quiz-mini-card .qmc-suit { font-size: 1.4rem; line-height: 1; }
+    .quiz-mini-card.red .qmc-rank, .quiz-mini-card.red .qmc-suit { color: var(--red-card); }
+    .quiz-mini-card.black .qmc-rank, .quiz-mini-card.black .qmc-suit { color: var(--black-card); }
+
+    .quiz-actions {
+      display: flex;
+      gap: 0.6rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    .quiz-action-btn {
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 0.85rem;
+      letter-spacing: 2px;
+      padding: 0.7rem 1.4rem;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-transform: uppercase;
+    }
+    .quiz-action-btn:hover { filter: brightness(1.2); transform: translateY(-1px); }
+    .quiz-action-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    .quiz-action-btn.correct-answer { outline: 3px solid #2ecc71; outline-offset: 2px; animation: pulse-correct 0.4s ease; }
+    .quiz-action-btn.wrong-answer   { outline: 3px solid #e74c3c; outline-offset: 2px; animation: shake 0.4s ease; }
+
+    @keyframes pulse-correct { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+    @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
+
+    .quiz-feedback {
+      text-align: center;
+      font-size: 1.1rem;
+      font-weight: 700;
+      min-height: 1.6rem;
+      transition: all 0.3s;
+      margin-bottom: 0.8rem;
+    }
+    .quiz-feedback.correct { color: #2ecc71; }
+    .quiz-feedback.wrong   { color: #e74c3c; }
+
+    .quiz-score-row {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .quiz-score-box {
+      text-align: center;
+      background: rgba(0,0,0,0.2);
+      border: 1px solid rgba(201,168,76,0.15);
+      border-radius: 6px;
+      padding: 0.5rem 1.2rem;
+    }
+    .quiz-score-num { font-family: 'DM Mono', monospace; font-size: 1.4rem; color: var(--gold); }
+    .quiz-score-lbl { font-size: 0.65rem; letter-spacing: 2px; text-transform: uppercase; color: rgba(201,168,76,0.5); }
+
+    /* Animations */
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    .fade-in { animation: fadeIn 0.3s ease forwards; }
+
+    /* Divider inside panels */
+    .divider { border: none; border-top: 1px solid rgba(201,168,76,0.12); margin: 0.9rem 0; }
+
+    /* Notification */
+    .deck-done-msg {
+      text-align: center;
+      padding: 1rem;
+      background: rgba(201,168,76,0.1);
+      border: 1px solid rgba(201,168,76,0.3);
+      border-radius: 6px;
+      color: var(--gold);
+      font-weight: 700;
+      letter-spacing: 1px;
+      font-size: 0.9rem;
+    }
+
+    /* ── GUIDE TAB ── */
+    #guide-section {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 1.8rem 1rem 3rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+    .guide-block {
+      background: rgba(0,0,0,0.22);
+      border: 1px solid rgba(201,168,76,0.18);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .guide-block-header {
+      background: rgba(0,0,0,0.3);
+      border-bottom: 1px solid rgba(201,168,76,0.18);
+      padding: 1rem 1.4rem;
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+    .guide-block-icon {
+      font-size: 1.4rem;
+      line-height: 1;
+    }
+    .guide-block-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--gold);
+    }
+    .guide-block-body {
+      padding: 1.4rem;
+    }
+    .guide-p {
+      font-size: 0.92rem;
+      line-height: 1.75;
+      color: rgba(245,240,232,0.85);
+      margin-bottom: 0.9rem;
+    }
+    .guide-p:last-child { margin-bottom: 0; }
+    .guide-p strong { color: var(--gold-l); font-weight: 700; }
+    .guide-p em { color: #7dcea0; font-style: normal; font-weight: 600; }
+
+    /* Steps */
+    .guide-steps { display: flex; flex-direction: column; gap: 1rem; }
+    .guide-step {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+    .step-num {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--gold);
+      color: #111;
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .step-content {}
+    .step-title {
+      font-weight: 700;
+      font-size: 0.92rem;
+      color: var(--gold-l);
+      margin-bottom: 0.3rem;
+      letter-spacing: 0.5px;
+    }
+    .step-desc {
+      font-size: 0.87rem;
+      line-height: 1.65;
+      color: rgba(245,240,232,0.8);
+    }
+    .step-desc strong { color: var(--gold-l); }
+
+    /* Hi-Lo value cards */
+    .hilo-cards {
+      display: flex;
+      gap: 0.8rem;
+      flex-wrap: wrap;
+      margin: 1rem 0;
+    }
+    .hilo-group {
+      flex: 1;
+      min-width: 140px;
+      border-radius: 8px;
+      padding: 0.9rem;
+      text-align: center;
+    }
+    .hilo-group.plus  { background: rgba(46,204,113,0.12); border: 1px solid rgba(46,204,113,0.3); }
+    .hilo-group.zero  { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); }
+    .hilo-group.minus { background: rgba(231,76,60,0.12); border: 1px solid rgba(231,76,60,0.3); }
+    .hilo-group-val {
+      font-family: 'DM Mono', monospace;
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin-bottom: 0.3rem;
+    }
+    .hilo-group.plus  .hilo-group-val { color: #2ecc71; }
+    .hilo-group.zero  .hilo-group-val { color: #aaa; }
+    .hilo-group.minus .hilo-group-val { color: #e74c3c; }
+    .hilo-group-cards {
+      font-size: 0.82rem;
+      font-family: 'DM Mono', monospace;
+      color: rgba(245,240,232,0.7);
+      margin-bottom: 0.4rem;
+    }
+    .hilo-group-meaning {
+      font-size: 0.75rem;
+      color: rgba(245,240,232,0.5);
+      letter-spacing: 0.5px;
+    }
+
+    /* Bet ramp table */
+    .bet-ramp {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0.8rem 0;
+    }
+    .bet-ramp th {
+      font-size: 0.7rem;
+      letter-spacing: 2px;
+      color: var(--gold);
+      text-transform: uppercase;
+      padding: 0.5rem 0.8rem;
+      text-align: left;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(201,168,76,0.15);
+    }
+    .bet-ramp td {
+      font-size: 0.87rem;
+      padding: 0.55rem 0.8rem;
+      border: 1px solid rgba(255,255,255,0.06);
+      cursor: default;
+      transform: none;
+    }
+    .bet-ramp td:hover { filter: none; transform: none; }
+    .bet-ramp tr:nth-child(even) td { background: rgba(0,0,0,0.15); }
+    .tc-cell { font-family: 'DM Mono', monospace; font-weight: 700; }
+    .bet-cell { font-weight: 700; }
+    .reason-cell { color: rgba(245,240,232,0.65); font-size: 0.82rem; }
+
+    /* Action explainer cards */
+    .action-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 0.9rem;
+      margin-top: 0.6rem;
+    }
+    .action-card {
+      border-radius: 8px;
+      padding: 1rem;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .action-card.ah  { background: rgba(245,240,232,0.08); }
+    .action-card.as  { background: rgba(192,57,43,0.12); border-color: rgba(192,57,43,0.3); }
+    .action-card.ad  { background: rgba(30,132,73,0.12); border-color: rgba(30,132,73,0.3); }
+    .action-card.asp { background: rgba(212,172,13,0.12); border-color: rgba(212,172,13,0.3); }
+    .action-card.asur{ background: rgba(26,82,118,0.15); border-color: rgba(26,82,118,0.35); }
+    .ac-badge {
+      display: inline-block;
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 0.78rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 4px;
+      margin-bottom: 0.6rem;
+      letter-spacing: 1px;
+    }
+    .ah  .ac-badge { background: var(--ah);  color: var(--ah-t);  }
+    .as  .ac-badge { background: var(--as);  color: var(--as-t);  }
+    .ad  .ac-badge { background: var(--ad);  color: var(--ad-t);  }
+    .asp .ac-badge { background: var(--asp); color: var(--asp-t); }
+    .asur .ac-badge { background: var(--asur); color: var(--asur-t); font-size: 0.7rem; }
+    .ac-name { font-size: 0.95rem; font-weight: 700; color: var(--white); margin-bottom: 0.35rem; }
+    .ac-desc { font-size: 0.82rem; color: rgba(245,240,232,0.7); line-height: 1.6; }
+    .ac-example { margin-top: 0.5rem; font-size: 0.78rem; color: rgba(201,168,76,0.7); font-style: italic; }
+
+    /* Tips grid */
+    .tips-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 0.8rem;
+    }
+    .tip-card {
+      background: rgba(0,0,0,0.2);
+      border: 1px solid rgba(201,168,76,0.12);
+      border-radius: 8px;
+      padding: 0.9rem;
+    }
+    .tip-icon { font-size: 1.3rem; margin-bottom: 0.4rem; }
+    .tip-title { font-size: 0.85rem; font-weight: 700; color: var(--gold-l); margin-bottom: 0.3rem; }
+    .tip-desc { font-size: 0.8rem; color: rgba(245,240,232,0.7); line-height: 1.55; }
+
+    /* GitHub instructions */
+    .github-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+    }
+    .gh-step {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      padding: 0.9rem 1rem;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .gh-num {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: rgba(201,168,76,0.2);
+      border: 1px solid var(--gold-d);
+      color: var(--gold);
+      font-family: 'DM Mono', monospace;
+      font-weight: 700;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .gh-text { flex: 1; }
+    .gh-title { font-weight: 700; font-size: 0.9rem; color: var(--white); margin-bottom: 0.25rem; }
+    .gh-desc { font-size: 0.83rem; color: rgba(245,240,232,0.7); line-height: 1.6; }
+    .gh-desc strong { color: var(--gold-l); }
+    .gh-desc code {
+      background: rgba(0,0,0,0.4);
+      border: 1px solid rgba(201,168,76,0.2);
+      border-radius: 4px;
+      padding: 0.1rem 0.45rem;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.82rem;
+      color: #7dcea0;
+    }
+    .gh-result {
+      margin-top: 1rem;
+      padding: 0.9rem 1.1rem;
+      background: rgba(46,204,113,0.1);
+      border: 1px solid rgba(46,204,113,0.25);
+      border-radius: 8px;
+      font-size: 0.87rem;
+      color: rgba(245,240,232,0.8);
+      line-height: 1.6;
+    }
+    .gh-result strong { color: #2ecc71; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+    ::-webkit-scrollbar-thumb { background: var(--gold-d); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">FlipJack</div>
+  <div class="tagline">Entrenador de Conteo de Cartas · Blackjack</div>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" id="tab-counter" onclick="switchTab('counter')">🃏 Contador Hi-Lo</button>
+  <button class="tab-btn" id="tab-strategy" onclick="switchTab('strategy')">📊 Estrategia</button>
+  <button class="tab-btn" id="tab-guide" onclick="switchTab('guide')">📖 Guía</button>
+</nav>
+
+<!-- ══ COUNTER TAB ══════════════════════════════════ -->
+<section id="counter-section">
+
+  <!-- Card Display -->
+  <div class="panel card-panel">
+    <div class="panel-title">Carta Actual</div>
+    <div class="card-area">
+      <div class="card-stage">
+        <div class="card-stage-shadow">
+        <div class="playing-card" id="playing-card">
+          <div class="card-face" id="card-face">
+            <div class="card-rank-top" id="rank-top">A</div>
+            <div class="card-suit-center" id="suit-center">♠</div>
+            <div class="card-rank-bot" id="rank-bot">A</div>
+          </div>
+          <div class="card-back-face">
+            <div class="card-back-pattern">
+              <div class="card-back-logo">D</div>
+            </div>
+          </div>
+        </div>
+        </div><!-- /.card-stage-shadow -->
+      </div>
+      <div class="hilo-badge zero" id="hilo-badge">— —</div>
+      <div style="font-size:0.72rem;letter-spacing:2px;color:rgba(201,168,76,0.5);text-transform:uppercase;text-align:center" id="card-hint">Presiona Siguiente Carta</div>
+    </div>
+  </div>
+
+  <!-- Stats Panel -->
+  <div class="panel stats-panel">
+    <div class="panel-title">Conteo & Estadísticas</div>
+    <div class="stats-grid" style="margin-bottom:0.9rem">
+      <div class="stat-box">
+        <div class="stat-label">Conteo Corriente</div>
+        <div class="stat-value neutral" id="running-count">0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Conteo Verdadero</div>
+        <div class="stat-value neutral" id="true-count">0.0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Cartas Jugadas</div>
+        <div class="stat-value gold" id="dealt-count">0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Cartas Restantes</div>
+        <div class="stat-value gold" id="remaining-count">312</div>
+      </div>
+    </div>
+
+    <div class="panel-title">Recomendación de Apuesta</div>
+    <div class="bet-box bet-min" id="bet-box">
+      <div class="bet-label">Apuesta sugerida</div>
+      <div class="bet-amount" id="bet-amount">Mínima</div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="panel-title">Penetración del Mazo</div>
+    <div class="progress-wrap">
+      <div class="progress-bar" id="progress-bar" style="width:0%;background:#2ecc71"></div>
+    </div>
+    <div class="progress-info">
+      <span id="pct-text">0%</span>
+      <span id="deck-remain-text">6 mazos</span>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="panel controls-panel">
+    <div style="display:flex;flex-wrap:wrap;gap:1.2rem;align-items:flex-start">
+      <div style="flex:1;min-width:220px">
+        <div class="panel-title">Controles</div>
+        <div class="action-btns" style="margin-bottom:0.8rem">
+          <button class="btn btn-primary" id="btn-next" onclick="nextCard()">▶ Siguiente</button>
+          <button class="btn btn-secondary" id="btn-auto" onclick="toggleAuto()">⏩ Auto</button>
+          <button class="btn btn-danger" onclick="resetDeck()">↺ Reset</button>
+        </div>
+        <div class="speed-wrap">
+          <span class="speed-label">Velocidad:</span>
+          <input type="range" id="speed-slider" min="1" max="4" value="2" oninput="updateSpeed()">
+          <span style="font-size:0.75rem;color:var(--gold);font-family:'DM Mono',monospace;min-width:60px" id="speed-label">Normal</span>
+        </div>
+      </div>
+      <div style="flex:1;min-width:180px">
+        <div class="panel-title">Número de Mazos</div>
+        <div class="deck-btns" id="deck-btns">
+          <button class="deck-btn" onclick="setDecks(1)">1</button>
+          <button class="deck-btn" onclick="setDecks(2)">2</button>
+          <button class="deck-btn" onclick="setDecks(4)">4</button>
+          <button class="deck-btn active" onclick="setDecks(6)">6</button>
+          <button class="deck-btn" onclick="setDecks(8)">8</button>
+        </div>
+      </div>
+      <div style="flex:1;min-width:220px">
+        <div class="panel-title">Sistema Hi-Lo</div>
+        <div class="legend-row">
+          <div class="legend-item">
+            <div class="legend-dot plus">+1</div>
+            <div class="legend-text">Cartas 2–6</div>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot zero"> 0</div>
+            <div class="legend-text">Cartas 7–9</div>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot minus">-1</div>
+            <div class="legend-text">10, J, Q, K, A</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div class="panel history-panel">
+    <div class="panel-title">Últimas 10 Cartas</div>
+    <div class="history-row" id="history-row">
+      <span style="font-size:0.8rem;color:rgba(255,255,255,0.3);font-style:italic">Sin cartas todavía...</span>
+    </div>
+  </div>
+
+</section>
+
+<!-- ══ STRATEGY TAB ══════════════════════════════════ -->
+<section id="strategy-section" style="display:none">
+
+  <div class="strategy-controls">
+    <button class="filter-btn active" id="filter-all"   onclick="filterTable('all')">Todas</button>
+    <button class="filter-btn"        id="filter-hard"  onclick="filterTable('hard')">Manos Duras</button>
+    <button class="filter-btn"        id="filter-soft"  onclick="filterTable('soft')">Manos Blandas</button>
+    <button class="filter-btn"        id="filter-pairs" onclick="filterTable('pairs')">Pares</button>
+    <button class="filter-btn quiz-toggle" id="quiz-toggle-btn" onclick="toggleQuiz()">🎯 Modo Quiz</button>
+  </div>
+
+  <div class="strategy-table-wrap">
+    <table id="strategy-table"></table>
+  </div>
+
+  <div class="strategy-legend">
+    <div class="sleg-item"><div class="sleg-dot action-H">H</div><div class="sleg-text">Pedir (Hit)</div></div>
+    <div class="sleg-item"><div class="sleg-dot action-S">S</div><div class="sleg-text">Plantarse (Stand)</div></div>
+    <div class="sleg-item"><div class="sleg-dot action-D">D</div><div class="sleg-text">Doblar (Double)</div></div>
+    <div class="sleg-item"><div class="sleg-dot action-SP">SP</div><div class="sleg-text">Dividir (Split)</div></div>
+    <div class="sleg-item"><div class="sleg-dot action-SUR" style="font-size:0.6rem">SUR</div><div class="sleg-text">Rendirse (Surrender)</div></div>
+  </div>
+
+  <!-- Quiz section -->
+  <div id="quiz-section" style="display:none">
+    <div class="quiz-title">🎯 Modo Quiz — ¿Cuál es la jugada correcta?</div>
+    <div class="quiz-scenario">
+      <div class="quiz-card-group">
+        <div class="quiz-card-label">Carta del Dealer</div>
+        <div class="quiz-cards" id="quiz-dealer-cards"></div>
+      </div>
+      <div style="font-family:'Playfair Display',serif;font-size:2rem;color:rgba(201,168,76,0.4);">vs</div>
+      <div class="quiz-card-group">
+        <div class="quiz-card-label">Tu Mano</div>
+        <div class="quiz-cards" id="quiz-player-cards"></div>
+      </div>
+    </div>
+    <div class="quiz-actions" id="quiz-actions"></div>
+    <div class="quiz-feedback" id="quiz-feedback"></div>
+    <div class="quiz-score-row">
+      <div class="quiz-score-box">
+        <div class="quiz-score-num" id="quiz-correct">0</div>
+        <div class="quiz-score-lbl">Correctas</div>
+      </div>
+      <div class="quiz-score-box">
+        <div class="quiz-score-num" id="quiz-total">0</div>
+        <div class="quiz-score-lbl">Total</div>
+      </div>
+      <div class="quiz-score-box">
+        <div class="quiz-score-num" id="quiz-pct">—</div>
+        <div class="quiz-score-lbl">Precisión</div>
+      </div>
+      <button class="btn btn-primary" style="padding:0.5rem 1.2rem;font-size:0.8rem" onclick="nextQuizQuestion()">Siguiente ▶</button>
+    </div>
+  </div>
+
+</section>
+
+<!-- ══ GUIDE TAB ══════════════════════════════════ -->
+<section id="guide-section" style="display:none">
+<div id="guide-section-inner">
+
+  <!-- ① ¿Qué es el conteo? -->
+  <div class="guide-block">
+    <div class="guide-block-header">
+      <div class="guide-block-icon">🧠</div>
+      <div class="guide-block-title">¿Qué es el Conteo de Cartas?</div>
+    </div>
+    <div class="guide-block-body">
+      <p class="guide-p">El conteo de cartas es una técnica matemática que te permite saber cuándo el mazo es <strong>favorable para el jugador</strong> y cuándo es favorable para el casino. No es trampa ni magia — es estadística pura.</p>
+      <p class="guide-p">La idea central es simple: un mazo con <em>muchas cartas altas (10, J, Q, K, A)</em> beneficia al jugador porque aumenta la probabilidad de blackjacks naturales (que pagan 3:2) y el dealer tiene más probabilidad de pasarse de 21. Un mazo con <em>muchas cartas bajas (2–6)</em> beneficia al casino.</p>
+      <p class="guide-p">Contando correctamente puedes obtener una <strong>ventaja del 0.5% al 1.5%</strong> sobre el casino — que normalmente tiene ventaja sobre ti. Los casinos lo permiten legalmente pero intentan detectarlo y pedirte que no juegues más.</p>
+    </div>
+  </div>
+
+  <!-- ② Sistema Hi-Lo paso a paso -->
+  <div class="guide-block">
+    <div class="guide-block-header">
+      <div class="guide-block-icon">🔢</div>
+      <div class="guide-block-title">El Sistema Hi-Lo — Paso a Paso</div>
+    </div>
+    <div class="guide-block-body">
+      <p class="guide-p" style="margin-bottom:1rem">Hi-Lo es el sistema más popular. A cada carta le asignas un valor y vas sumando mentalmente mientras se reparten.</p>
+
+      <div class="hilo-cards">
+        <div class="hilo-group plus">
+          <div class="hilo-group-val">+1</div>
+          <div class="hilo-group-cards">2 · 3 · 4 · 5 · 6</div>
+          <div class="hilo-group-meaning">Cartas bajas — el mazo mejora</div>
+        </div>
+        <div class="hilo-group zero">
+          <div class="hilo-group-val">0</div>
+          <div class="hilo-group-cards">7 · 8 · 9</div>
+          <div class="hilo-group-meaning">Cartas neutras — ignóralas</div>
+        </div>
+        <div class="hilo-group minus">
+          <div class="hilo-group-val">−1</div>
+          <div class="hilo-group-cards">10 · J · Q · K · A</div>
+          <div class="hilo-group-meaning">Cartas altas — el mazo empeora</div>
+        </div>
+      </div>
+
+      <div class="guide-steps">
+        <div class="guide-step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <div class="step-title">Memoriza los valores</div>
+            <div class="step-desc">Cada vez que veas una carta en la mesa, súmale su valor al conteo. Ve 3 → +1. Ve K → −1. Ve 8 → +0. <strong>Usa el entrenador</strong> en la pestaña Contador para practicar hasta que sea automático.</div>
+          </div>
+        </div>
+        <div class="guide-step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <div class="step-title">Mantén el Conteo Corriente (Running Count)</div>
+            <div class="step-desc">Es la suma acumulada de todos los valores. Empieza en 0 al inicio del mazo y súmale o réstale con cada carta vista. <strong>Incluye todas las cartas visibles</strong>: las tuyas, las del dealer y las de otros jugadores.</div>
+          </div>
+        </div>
+        <div class="guide-step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <div class="step-title">Calcula el Conteo Verdadero (True Count)</div>
+            <div class="step-desc">Con varios mazos, el Running Count solo no basta. Debes normalizarlo: <strong>TC = Running Count ÷ Mazos Restantes</strong>. Si RC = +6 y quedan 3 mazos, TC = +2. Esto hace el conteo comparable sin importar cuántos mazos use el casino.</div>
+          </div>
+        </div>
+        <div class="guide-step">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <div class="step-title">Ajusta tu apuesta según el True Count</div>
+            <div class="step-desc">Aquí está el dinero real. Cuando el TC es alto, el mazo es favorable — <strong>apuesta más</strong>. Cuando es bajo o negativo — <strong>apuesta el mínimo</strong>.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ③ Rampa de apuestas -->
+  <div class="guide-block">
+    <div class="guide-block-header">
+      <div class="guide-block-icon">💰</div>
+      <div class="guide-block-title">Cuándo y Cuánto Apostar — La Rampa de Apuestas</div>
+    </div>
+    <div class="guide-block-body">
+      <p class="guide-p">Supón que tu apuesta base (mínima) es $10. Así escalarías tus apuestas según el True Count:</p>
+      <table class="bet-ramp">
+        <thead>
+          <tr><th>True Count</th><th>Apuesta</th><th>Ejemplo ($10 base)</th><th>¿Por qué?</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="tc-cell" style="color:#e74c3c">TC &lt; 0</td>
+            <td class="bet-cell" style="color:#e74c3c">Mínima (1×)</td>
+            <td>$10</td>
+            <td class="reason-cell">Mazo favorable al casino — minimiza pérdidas</td>
+          </tr>
+          <tr>
+            <td class="tc-cell" style="color:#aaa">TC = 0 a +1</td>
+            <td class="bet-cell">Normal (1×)</td>
+            <td>$10</td>
+            <td class="reason-cell">Situación neutra, sin ventaja significativa</td>
+          </tr>
+          <tr>
+            <td class="tc-cell" style="color:#f1c40f">TC = +1 a +2</td>
+            <td class="bet-cell" style="color:#f1c40f">Doble (2×)</td>
+            <td>$20</td>
+            <td class="reason-cell">Ligera ventaja — vale la pena subir</td>
+          </tr>
+          <tr>
+            <td class="tc-cell" style="color:#e8c96e">TC = +2 a +3</td>
+            <td class="bet-cell" style="color:#e8c96e">Cuádruple (4×)</td>
+            <td>$40</td>
+            <td class="reason-cell">Ventaja clara — el mazo está cargado de 10s y Ases</td>
+          </tr>
+          <tr>
+            <td class="tc-cell" style="color:#2ecc71">TC &gt; +3</td>
+            <td class="bet-cell" style="color:#2ecc71">Máxima (8×+)</td>
+            <td>$80+</td>
+            <td class="reason-cell">Ventaja grande — momento de capitalizar al máximo</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="guide-p" style="margin-top:0.6rem"><strong>Nota:</strong> Apostar de $10 a $80 de golpe llama la atención. Los contadores expertos usan <em>cover bets</em> (apuestas de camuflaje) y escalan gradualmente para no ser detectados.</p>
+    </div>
+  </div>
+
+  <!-- ④ Cómo leer la tabla de estrategia -->
+  <div class="guide-block">
+    <div class="guide-block-header">
+      <div class="guide-block-icon">📊</div>
+      <div class="guide-block-title">Cómo Leer la Tabla de Estrategia Básica</div>
+    </div>
+    <div class="guide-block-body">
+      <p class="guide-p">La <strong>estrategia básica</strong> es la base matemáticamente óptima para jugar cada mano, calculada por computadora simulando millones de partidas. Usarla correctamente reduce la ventaja del casino al <strong>0.5%</strong> — sin contar cartas.</p>
+      <p class="guide-p">Para usarla: encuentra <strong>tu mano en la fila</strong> (izquierda) y la <strong>carta visible del dealer en la columna</strong> (arriba). La celda donde se cruzan te dice qué hacer.</p>
+
+      <div class="action-cards">
+        <div class="action-card ah">
+          <span class="ac-badge">H</span>
+          <div class="ac-name">Pedir carta (Hit)</div>
+          <div class="ac-desc">Solicitas una carta adicional. Lo haces cuando tu mano es débil y el riesgo de pasarte es menor que el riesgo de quedarte.</div>
+          <div class="ac-example">Ejemplo: tienes 8 contra cualquier carta del dealer → siempre pide.</div>
+        </div>
+        <div class="action-card as">
+          <span class="ac-badge">S</span>
+          <div class="ac-name">Plantarse (Stand)</div>
+          <div class="ac-desc">No pides más cartas. Lo haces cuando tu mano es fuerte o cuando el dealer tiene alta probabilidad de pasarse.</div>
+          <div class="ac-example">Ejemplo: tienes 13–16 y el dealer muestra 2–6 → plántate, el dealer debe pedir y puede pasarse.</div>
+        </div>
+        <div class="action-card ad">
+          <span class="ac-badge">D</span>
+          <div class="ac-name">Doblar (Double Down)</div>
+          <div class="ac-desc">Duplicas tu apuesta y recibes <em>exactamente una</em> carta más. Solo cuando tienes alta probabilidad de llegar a un total fuerte.</div>
+          <div class="ac-example">Ejemplo: tienes 11 contra dealer 6 → dobla siempre, es la jugada más rentable del blackjack.</div>
+        </div>
+        <div class="action-card asp">
+          <span class="ac-badge">SP</span>
+          <div class="ac-name">Dividir (Split)</div>
+          <div class="ac-desc">Con un par, puedes separarlo en dos manos independientes, igualando tu apuesta. Convierte una mano mala en dos potencialmente buenas.</div>
+          <div class="ac-example">Ejemplo: siempre divide Ases y 8s. Nunca dividas 10s ni 5s.</div>
+        </div>
+        <div class="action-card asur">
+          <span class="ac-badge">SUR</span>
+          <div class="ac-name">Rendirse (Surrender)</div>
+          <div class="ac-desc">Si el casino lo permite, puedes rendirte y recuperar la mitad de tu apuesta. Úsalo cuando tienes menos del 25% de probabilidad de ganar.</div>
+          <div class="ac-example">Ejemplo: tienes 16 contra dealer 10 → rendirse te cuesta 0.5× en vez de perder 1× en promedio.</div>
+        </div>
+      </div>
+
+      <p class="guide-p" style="margin-top:1.2rem"><strong>Reglas clave que debes memorizar primero:</strong></p>
+      <div class="guide-steps" style="gap:0.6rem">
+        <div class="guide-step">
+          <div class="step-num" style="background:rgba(201,168,76,0.3);color:var(--gold);border:1px solid var(--gold-d)">★</div>
+          <div class="step-content"><div class="step-desc"><strong>Siempre divide Ases y 8s</strong> — sin excepciones. Ases dan dos posibles blackjacks; 16 es la peor mano posible y dividirla mejora ambas.</div></div>
+        </div>
+        <div class="guide-step">
+          <div class="step-num" style="background:rgba(201,168,76,0.3);color:var(--gold);border:1px solid var(--gold-d)">★</div>
+          <div class="step-content"><div class="step-desc"><strong>Nunca dividas 10s ni 5s</strong> — 20 es casi imbatible; dos 5s son mejor tratarlos como 10 y doblar.</div></div>
+        </div>
+        <div class="guide-step">
+          <div class="step-num" style="background:rgba(201,168,76,0.3);color:var(--gold);border:1px solid var(--gold-d)">★</div>
+          <div class="step-content"><div class="step-desc"><strong>Dobla siempre en 11</strong> contra cualquier carta del dealer (excepto As en algunos juegos). Es la situación con mayor ventaja esperada.</div></div>
+        </div>
+        <div class="guide-step">
+          <div class="step-num" style="background:rgba(201,168,76,0.3);color:var(--gold);border:1px solid var(--gold-d)">★</div>
+          <div class="step-content"><div class="step-desc"><strong>Dealer muestra 2–6:</strong> es su zona débil. Plántate con 12+, dobla agresivamente, divide más pares. Déjalo pasarse.</div></div>
+        </div>
+        <div class="guide-step">
+          <div class="step-num" style="background:rgba(201,168,76,0.3);color:var(--gold);border:1px solid var(--gold-d)">★</div>
+          <div class="step-content"><div class="step-desc"><strong>Nunca tomes el seguro</strong> (insurance). Aunque parece tentador cuando el dealer muestra As, matemáticamente es una apuesta perdedora a largo plazo.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑤ Consejos de casino -->
+  <div class="guide-block">
+    <div class="guide-block-header">
+      <div class="guide-block-icon">🎰</div>
+      <div class="guide-block-title">Consejos para el Casino</div>
+    </div>
+    <div class="guide-block-body">
+      <div class="tips-grid">
+        <div class="tip-card">
+          <div class="tip-icon">🏠</div>
+          <div class="tip-title">Practica en casa primero</div>
+          <div class="tip-desc">Debes poder contar sin pensar, como cuando manejas. Usa este entrenador en modo auto-play rápido hasta que el conteo sea completamente automático.</div>
+        </div>
+        <div class="tip-card">
+          <div class="tip-icon">🎯</div>
+          <div class="tip-title">Busca las mejores reglas</div>
+          <div class="tip-desc">Busca mesas que paguen 3:2 en blackjack (no 6:5), que el dealer se plante en soft 17, que permitan doblar después de dividir y que ofrezcan surrender.</div>
+        </div>
+        <div class="tip-card">
+          <div class="tip-icon">🎭</div>
+          <div class="tip-title">Sé discreto</div>
+          <div class="tip-desc">Actúa como un jugador normal. No cambies tu apuesta de mínimo a máximo de golpe. Escala gradualmente. Conversa, bebe algo (con moderación), lleva a alguien.</div>
+        </div>
+        <div class="tip-card">
+          <div class="tip-icon">📚</div>
+          <div class="tip-title">Entiende tus límites</div>
+          <div class="tip-desc">La ventaja del contador es pequeña (~1%). Necesitas bankroll suficiente para sobrevivir la varianza. Con $1,000 de bankroll, tu apuesta base no debería superar $10–15.</div>
+        </div>
+        <div class="tip-card">
+          <div class="tip-icon">👁️</div>
+          <div class="tip-title">Los pit bosses te observan</div>
+          <div class="tip-desc">Buscan patrones: cortar fichas al tocar y apostar fuerte cuando el mazo se completa. Si te identifican, te pedirán que no juegues más blackjack — es su derecho.</div>
+        </div>
+        <div class="tip-card">
+          <div class="tip-icon">🧮</div>
+          <div class="tip-title">Practica multitarea</div>
+          <div class="tip-desc">En el casino debes contar mientras mantienes conversación, tomas decisiones de estrategia y actúas natural. Practica contando mientras ves TV o hablas con alguien.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑥ Publicar en GitHub -->
+  <div class="guide-block">
+    <div class="guide-block-header">
+      <div class="guide-block-icon">🐙</div>
+      <div class="guide-block-title">Cómo Publicar en GitHub Pages (Gratis)</div>
+    </div>
+    <div class="guide-block-body">
+      <p class="guide-p" style="margin-bottom:1.2rem">GitHub Pages te da una URL pública permanente y gratis. El proceso toma ~5 minutos.</p>
+      <div class="github-steps">
+        <div class="gh-step">
+          <div class="gh-num">1</div>
+          <div class="gh-text">
+            <div class="gh-title">Crea una cuenta en GitHub</div>
+            <div class="gh-desc">Ve a <strong>github.com</strong> y regístrate con tu email. Es completamente gratis.</div>
+          </div>
+        </div>
+        <div class="gh-step">
+          <div class="gh-num">2</div>
+          <div class="gh-text">
+            <div class="gh-title">Crea un repositorio nuevo</div>
+            <div class="gh-desc">Haz clic en el botón verde <strong>"New"</strong> (o el ícono +). Ponle un nombre como <code>blackjack-counter</code>. Márcalo como <strong>Public</strong>. Activa <strong>"Add a README file"</strong>. Clic en <strong>"Create repository"</strong>.</div>
+          </div>
+        </div>
+        <div class="gh-step">
+          <div class="gh-num">3</div>
+          <div class="gh-text">
+            <div class="gh-title">Sube el archivo index.html</div>
+            <div class="gh-desc">Dentro del repositorio, haz clic en <strong>"Add file" → "Upload files"</strong>. Arrastra el archivo <code>index.html</code> de tu carpeta <code>conteo_cartas</code>. Escribe un mensaje como "Add blackjack trainer" y haz clic en <strong>"Commit changes"</strong>.</div>
+          </div>
+        </div>
+        <div class="gh-step">
+          <div class="gh-num">4</div>
+          <div class="gh-text">
+            <div class="gh-title">Activa GitHub Pages</div>
+            <div class="gh-desc">Ve a <strong>Settings</strong> (pestaña arriba a la derecha del repo). En el menú lateral busca <strong>"Pages"</strong>. En <em>Source</em>, selecciona <strong>"Deploy from a branch"</strong>. En <em>Branch</em>, selecciona <strong>"main"</strong> y carpeta <strong>"/ (root)"</strong>. Haz clic en <strong>"Save"</strong>.</div>
+          </div>
+        </div>
+        <div class="gh-step">
+          <div class="gh-num">5</div>
+          <div class="gh-text">
+            <div class="gh-title">Espera ~2 minutos y visita tu URL</div>
+            <div class="gh-desc">GitHub construye tu sitio automáticamente. Tu URL será: <code>https://TU-USUARIO.github.io/blackjack-counter/</code>. Refresca la página de Settings → Pages hasta que aparezca el link activo en verde.</div>
+          </div>
+        </div>
+      </div>
+      <div class="gh-result">
+        ✅ <strong>¡Listo!</strong> Tu entrenador está publicado y accesible desde cualquier dispositivo en el mundo. Cada vez que subas una versión nueva del <code>index.html</code>, GitHub Pages se actualiza automáticamente en ~1 minuto.
+      </div>
+    </div>
+  </div>
+
+</div>
+</section>
+
+<script>
+/* ══════════════════════════════════════════
+   CARD COUNTER ENGINE
+══════════════════════════════════════════ */
+
+const SUITS    = ['♠','♥','♦','♣'];
+const RANKS    = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+const RED_SUITS = new Set(['♥','♦']);
+
+function hiLo(rank) {
+  if ('23456'.includes(rank) && rank !== '10') return +1;
+  if (rank === '7' || rank === '8' || rank === '9') return 0;
+  return -1; // 10, J, Q, K, A
+}
+
+function createDeck(n) {
+  const d = [];
+  for (let i = 0; i < n; i++)
+    for (const s of SUITS)
+      for (const r of RANKS)
+        d.push({ suit: s, rank: r, val: hiLo(r) });
+  return d;
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+let deck = [];
+let deckIdx = 0;
+let numDecks = 6;
+let runCount = 0;
+let history = [];
+let autoTimer = null;
+let isFlipping = false;
+let speedMs = 900;
+let started = false;
+
+const speedMap = { 1: [2200,'Lento'], 2: [900,'Normal'], 3: [480,'Rápido'], 4: [220,'Muy Rápido'] };
+
+function initDeck() {
+  deck = shuffle(createDeck(numDecks));
+  deckIdx = 0;
+  runCount = 0;
+  history = [];
+  started = false;
+  // Reset card to back
+  document.getElementById('playing-card').classList.remove('revealed');
+  document.getElementById('hilo-badge').textContent = '— —';
+  document.getElementById('hilo-badge').className = 'hilo-badge zero';
+  document.getElementById('card-hint').textContent = 'Presiona Siguiente Carta';
+  updateStats();
+  renderHistory();
+}
+
+function nextCard() {
+  if (isFlipping) return;
+  if (deckIdx >= deck.length) {
+    stopAuto();
+    document.getElementById('card-hint').textContent = '¡Mazo agotado! Haz reset para continuar.';
+    document.getElementById('btn-next').disabled = true;
+    return;
+  }
+
+  const card = deck[deckIdx];
+  deckIdx++;
+  isFlipping = true;
+  started = true;
+
+  const cardEl = document.getElementById('playing-card');
+  const wasRevealed = cardEl.classList.contains('revealed');
+
+  const doReveal = () => {
+    // Update card face content
+    const face = document.getElementById('card-face');
+    const rankTop = document.getElementById('rank-top');
+    const rankBot = document.getElementById('rank-bot');
+    const suitCtr = document.getElementById('suit-center');
+    const isRed = RED_SUITS.has(card.suit);
+    face.className = 'card-face ' + (isRed ? 'red' : 'black');
+    rankTop.textContent = card.rank;
+    rankBot.textContent = card.rank;
+    suitCtr.textContent = card.suit;
+    cardEl.classList.add('revealed');
+
+    // Update hi-lo badge
+    const badge = document.getElementById('hilo-badge');
+    const hint  = document.getElementById('card-hint');
+    if (card.val === +1) {
+      badge.textContent = '+1'; badge.className = 'hilo-badge plus';
+      hint.textContent = 'Carta BAJA → el mazo mejora para ti';
+    } else if (card.val === -1) {
+      badge.textContent = '−1'; badge.className = 'hilo-badge minus';
+      hint.textContent = 'Carta ALTA → el mazo empeora para ti';
+    } else {
+      badge.textContent = '0'; badge.className = 'hilo-badge zero';
+      hint.textContent = 'Carta NEUTRA → conteo sin cambio';
+    }
+
+    setTimeout(() => {
+      runCount += card.val;
+      history.unshift(card);
+      if (history.length > 10) history.pop();
+      updateStats();
+      renderHistory();
+      isFlipping = false;
+    }, 300);
+  };
+
+  if (wasRevealed) {
+    cardEl.classList.remove('revealed');
+    setTimeout(doReveal, 280);
+  } else {
+    setTimeout(doReveal, 80);
+  }
+}
+
+function updateStats() {
+  const total = numDecks * 52;
+  const remaining = total - deckIdx;
+  const decksLeft = Math.max(remaining / 52, 0.5);
+  const trueCount = runCount / decksLeft;
+  const pct = (deckIdx / total) * 100;
+
+  // Running count
+  const rcEl = document.getElementById('running-count');
+  rcEl.textContent = runCount > 0 ? '+' + runCount : runCount;
+  rcEl.className = 'stat-value ' + (runCount > 0 ? 'positive' : runCount < 0 ? 'negative' : 'neutral');
+
+  // True count
+  const tcEl = document.getElementById('true-count');
+  const tc = trueCount.toFixed(1);
+  tcEl.textContent = trueCount > 0 ? '+' + tc : tc;
+  tcEl.className = 'stat-value ' + (trueCount > 0 ? 'positive' : trueCount < 0 ? 'negative' : 'neutral');
+
+  // Dealt / remaining
+  document.getElementById('dealt-count').textContent = deckIdx;
+  document.getElementById('remaining-count').textContent = remaining;
+
+  // Progress
+  const pb = document.getElementById('progress-bar');
+  pb.style.width = pct.toFixed(1) + '%';
+  pb.style.backgroundColor = pct < 50 ? '#2ecc71' : pct < 75 ? '#f1c40f' : '#e74c3c';
+  document.getElementById('pct-text').textContent = pct.toFixed(0) + '%';
+  document.getElementById('deck-remain-text').textContent =
+    (remaining / 52).toFixed(1) + ' mazos restantes';
+
+  // Betting
+  const betBox  = document.getElementById('bet-box');
+  const betAmt  = document.getElementById('bet-amount');
+  if (!started) {
+    betBox.className = 'bet-box bet-min'; betAmt.textContent = 'Esperando...';
+  } else if (trueCount < 0) {
+    betBox.className = 'bet-box bet-min'; betAmt.textContent = 'Mínima — TC negativo';
+  } else if (trueCount < 1) {
+    betBox.className = 'bet-box bet-1x';  betAmt.textContent = 'Normal — 1× la base';
+  } else if (trueCount < 2) {
+    betBox.className = 'bet-box bet-2x';  betAmt.textContent = 'Dobla — 2× la base';
+  } else if (trueCount < 3) {
+    betBox.className = 'bet-box bet-4x';  betAmt.textContent = 'Cuadruplica — 4× la base';
+  } else {
+    betBox.className = 'bet-box bet-8x';  betAmt.textContent = '¡Máxima! — 8×+ la base';
+  }
+
+  document.getElementById('btn-next').disabled = deckIdx >= total;
+}
+
+function renderHistory() {
+  const row = document.getElementById('history-row');
+  if (history.length === 0) {
+    row.innerHTML = '<span style="font-size:0.8rem;color:rgba(255,255,255,0.3);font-style:italic">Sin cartas todavía...</span>';
+    return;
+  }
+  row.innerHTML = history.map(c => {
+    const isRed = RED_SUITS.has(c.suit);
+    const cls = isRed ? 'red' : 'black';
+    const badgeCls = c.val === +1 ? 'plus' : c.val === -1 ? 'minus' : 'zero';
+    const badgeTxt = c.val === +1 ? '+1' : c.val === -1 ? '−1' : '0';
+    return `<div class="mini-card ${cls}">
+      <span class="mc-rank">${c.rank}</span>
+      <span class="mc-suit">${c.suit}</span>
+      <div class="mini-badge ${badgeCls}">${badgeTxt}</div>
+    </div>`;
+  }).join('');
+}
+
+function setDecks(n) {
+  numDecks = n;
+  document.querySelectorAll('.deck-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  resetDeck();
+}
+
+function resetDeck() {
+  stopAuto();
+  document.getElementById('btn-auto').classList.remove('active');
+  document.getElementById('btn-auto').textContent = '⏩ Auto';
+  document.getElementById('btn-next').disabled = false;
+  initDeck();
+}
+
+function toggleAuto() {
+  if (autoTimer) {
+    stopAuto();
+  } else {
+    startAuto();
+  }
+}
+
+function startAuto() {
+  const btn = document.getElementById('btn-auto');
+  btn.classList.add('active');
+  btn.textContent = '⏸ Pausar';
+  autoTimer = setInterval(nextCard, speedMs);
+}
+
+function stopAuto() {
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+  const btn = document.getElementById('btn-auto');
+  btn.classList.remove('active');
+  btn.textContent = '⏩ Auto';
+}
+
+function updateSpeed() {
+  const val = parseInt(document.getElementById('speed-slider').value);
+  const [ms, lbl] = speedMap[val];
+  speedMs = ms;
+  document.getElementById('speed-label').textContent = lbl;
+  if (autoTimer) { stopAuto(); startAuto(); }
+}
+
+/* ══════════════════════════════════════════
+   STRATEGY TABLE
+══════════════════════════════════════════ */
+
+const DEALERS = ['2','3','4','5','6','7','8','9','10','A'];
+
+const STRATEGY = {
+  hard: [
+    { hand:'17+', actions:['S','S','S','S','S','S','S','S','S','S'] },
+    { hand:'16',  actions:['S','S','S','S','S','H','H','SUR','SUR','SUR'] },
+    { hand:'15',  actions:['S','S','S','S','S','H','H','H','SUR','H'] },
+    { hand:'14',  actions:['S','S','S','S','S','H','H','H','H','H'] },
+    { hand:'13',  actions:['S','S','S','S','S','H','H','H','H','H'] },
+    { hand:'12',  actions:['H','H','S','S','S','H','H','H','H','H'] },
+    { hand:'11',  actions:['D','D','D','D','D','D','D','D','D','H'] },
+    { hand:'10',  actions:['D','D','D','D','D','D','D','D','H','H'] },
+    { hand:'9',   actions:['H','D','D','D','D','H','H','H','H','H'] },
+    { hand:'5-8', actions:['H','H','H','H','H','H','H','H','H','H'] },
+  ],
+  soft: [
+    { hand:'A,9', actions:['S','S','S','S','S','S','S','S','S','S'] },
+    { hand:'A,8', actions:['S','S','S','S','D','S','S','S','S','S'] },
+    { hand:'A,7', actions:['S','D','D','D','D','S','S','H','H','H'] },
+    { hand:'A,6', actions:['H','D','D','D','D','H','H','H','H','H'] },
+    { hand:'A,5', actions:['H','H','D','D','D','H','H','H','H','H'] },
+    { hand:'A,4', actions:['H','H','D','D','D','H','H','H','H','H'] },
+    { hand:'A,3', actions:['H','H','H','D','D','H','H','H','H','H'] },
+    { hand:'A,2', actions:['H','H','H','D','D','H','H','H','H','H'] },
+  ],
+  pairs: [
+    { hand:'A,A',   actions:['SP','SP','SP','SP','SP','SP','SP','SP','SP','SP'] },
+    { hand:'10,10', actions:['S','S','S','S','S','S','S','S','S','S'] },
+    { hand:'9,9',   actions:['SP','SP','SP','SP','SP','S','SP','SP','S','S'] },
+    { hand:'8,8',   actions:['SP','SP','SP','SP','SP','SP','SP','SP','SP','SP'] },
+    { hand:'7,7',   actions:['SP','SP','SP','SP','SP','SP','H','H','H','H'] },
+    { hand:'6,6',   actions:['SP','SP','SP','SP','SP','H','H','H','H','H'] },
+    { hand:'5,5',   actions:['D','D','D','D','D','D','D','D','H','H'] },
+    { hand:'4,4',   actions:['H','H','H','SP','SP','H','H','H','H','H'] },
+    { hand:'3,3',   actions:['SP','SP','SP','SP','SP','SP','H','H','H','H'] },
+    { hand:'2,2',   actions:['SP','SP','SP','SP','SP','SP','H','H','H','H'] },
+  ]
+};
+
+const ACTION_LABELS = { H:'Pedir', S:'Plantar', D:'Doblar', SP:'Dividir', SUR:'Rendirse' };
+
+let currentFilter = 'all';
+let highlightedCell = null;
+
+function buildTable() {
+  const table = document.getElementById('strategy-table');
+  table.innerHTML = '';
+
+  // Header
+  const thead = document.createElement('thead');
+  const hrow = document.createElement('tr');
+  const th0 = document.createElement('th');
+  th0.className = 'hand-col';
+  th0.innerHTML = '<span style="color:rgba(201,168,76,0.6);font-size:0.65rem">TU MANO</span><br><span style="font-size:0.65rem;color:rgba(201,168,76,0.4)">↓ DEALER →</span>';
+  hrow.appendChild(th0);
+  DEALERS.forEach(d => {
+    const th = document.createElement('th');
+    th.textContent = d;
+    hrow.appendChild(th);
+  });
+  thead.appendChild(hrow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  const sections = [
+    { key:'hard',  label:'MANOS DURAS', show: currentFilter === 'all' || currentFilter === 'hard'  },
+    { key:'soft',  label:'MANOS BLANDAS', show: currentFilter === 'all' || currentFilter === 'soft' },
+    { key:'pairs', label:'PARES', show: currentFilter === 'all' || currentFilter === 'pairs' },
+  ];
+
+  sections.forEach(sec => {
+    if (!sec.show) return;
+    // Section header row
+    const srow = document.createElement('tr');
+    srow.className = 'section-header';
+    const stdc = document.createElement('td');
+    stdc.className = 'hand-name';
+    stdc.textContent = sec.label;
+    srow.appendChild(stdc);
+    for (let i = 0; i < DEALERS.length; i++) {
+      const std = document.createElement('td');
+      std.textContent = '';
+      std.style.background = 'rgba(201,168,76,0.06)';
+      srow.appendChild(std);
+    }
+    tbody.appendChild(srow);
+
+    STRATEGY[sec.key].forEach(row => {
+      const tr = document.createElement('tr');
+      const tdHand = document.createElement('td');
+      tdHand.className = 'hand-name';
+      tdHand.textContent = row.hand;
+      tr.appendChild(tdHand);
+
+      row.actions.forEach((action, colIdx) => {
+        const td = document.createElement('td');
+        td.className = 'action-' + action;
+        td.textContent = action;
+        td.dataset.action = action;
+        td.dataset.hand = row.hand;
+        td.dataset.dealer = DEALERS[colIdx];
+        td.title = `${row.hand} vs ${DEALERS[colIdx]}: ${ACTION_LABELS[action]}`;
+        td.onclick = () => highlightCell(td);
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+  });
+
+  table.appendChild(tbody);
+}
+
+function highlightCell(td) {
+  if (highlightedCell) highlightedCell.classList.remove('highlighted');
+  if (highlightedCell === td) {
+    highlightedCell = null;
+    return;
+  }
+  td.classList.add('highlighted');
+  highlightedCell = td;
+}
+
+function filterTable(f) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('filter-' + f).classList.add('active');
+  buildTable();
+}
+
+/* ══════════════════════════════════════════
+   QUIZ MODE
+══════════════════════════════════════════ */
+
+let quizActive = false;
+let quizCorrect = 0;
+let quizTotal   = 0;
+let quizCurrentAnswer = '';
+let quizAnswered = false;
+
+// Build all quiz scenarios from strategy data
+function buildScenarios() {
+  const scenarios = [];
+  Object.entries(STRATEGY).forEach(([type, rows]) => {
+    rows.forEach(row => {
+      row.actions.forEach((action, idx) => {
+        scenarios.push({
+          hand: row.hand,
+          dealer: DEALERS[idx],
+          action,
+          type
+        });
+      });
+    });
+  });
+  return scenarios;
+}
+const SCENARIOS = buildScenarios();
+
+function toggleQuiz() {
+  quizActive = !quizActive;
+  const btn = document.getElementById('quiz-toggle-btn');
+  const qs  = document.getElementById('quiz-section');
+  if (quizActive) {
+    btn.classList.add('active');
+    btn.textContent = '✕ Cerrar Quiz';
+    qs.style.display = 'block';
+    qs.classList.add('fade-in');
+    nextQuizQuestion();
+  } else {
+    btn.classList.remove('active');
+    btn.textContent = '🎯 Modo Quiz';
+    qs.style.display = 'none';
+  }
+}
+
+// Generate visual cards for a hand string like "A,7", "16", "8,8", "5-8"
+function handToCards(handStr) {
+  const suits = ['♠','♥','♦','♣'];
+  const rs = () => suits[Math.floor(Math.random() * suits.length)];
+  const isRed = s => ['♥','♦'].includes(s);
+
+  // Pairs
+  if (handStr.includes(',') && !handStr.startsWith('A')) {
+    const rank = handStr.split(',')[0];
+    return [[rank, rs()], [rank, rs()]];
+  }
+  // AA
+  if (handStr === 'A,A') return [['A', rs()], ['A', rs()]];
+  // Soft hands A,X
+  if (handStr.startsWith('A,')) {
+    const r2 = handStr.split(',')[1];
+    return [['A', rs()], [r2, rs()]];
+  }
+  // Hard totals — pick two cards that sum to it
+  const handRankMap = {
+    '17+':['9','8'], '16':['9','7'],'15':['8','7'],'14':['8','6'],
+    '13':['7','6'],'12':['7','5'],'11':['6','5'],'10':['6','4'],
+    '9':['5','4'],'5-8':['4','3']
+  };
+  const pair = handRankMap[handStr] || ['7','6'];
+  return [[pair[0], rs()], [pair[1], rs()]];
+}
+
+function renderQuizCard(rank, suit, container) {
+  const isRed = ['♥','♦'].includes(suit);
+  const div = document.createElement('div');
+  div.className = 'quiz-mini-card ' + (isRed ? 'red' : 'black');
+  div.innerHTML = `<span class="qmc-rank">${rank}</span><span class="qmc-suit">${suit}</span>`;
+  container.appendChild(div);
+}
+
+function nextQuizQuestion() {
+  quizAnswered = false;
+  const scenario = SCENARIOS[Math.floor(Math.random() * SCENARIOS.length)];
+  quizCurrentAnswer = scenario.action;
+
+  // Dealer cards
+  const dealerC = document.getElementById('quiz-dealer-cards');
+  dealerC.innerHTML = '';
+  const dSuit = ['♠','♥','♦','♣'][Math.floor(Math.random()*4)];
+  renderQuizCard(scenario.dealer, dSuit, dealerC);
+
+  // Player cards
+  const playerC = document.getElementById('quiz-player-cards');
+  playerC.innerHTML = '';
+  const cards = handToCards(scenario.hand);
+  cards.forEach(([r,s]) => renderQuizCard(r, s, playerC));
+
+  // Action buttons
+  const actionsDiv = document.getElementById('quiz-actions');
+  actionsDiv.innerHTML = '';
+  const allActions = ['H','S','D','SP','SUR'];
+  const actionNames = { H:'Pedir (H)', S:'Plantar (S)', D:'Doblar (D)', SP:'Dividir (SP)', SUR:'Rendirse (SUR)' };
+  const actionStyles = {
+    H:'background:var(--ah);color:var(--ah-t)',
+    S:'background:var(--as);color:var(--as-t)',
+    D:'background:var(--ad);color:var(--ad-t)',
+    SP:'background:var(--asp);color:var(--asp-t)',
+    SUR:'background:var(--asur);color:var(--asur-t)',
+  };
+
+  allActions.forEach(a => {
+    const btn = document.createElement('button');
+    btn.className = 'quiz-action-btn';
+    btn.setAttribute('style', actionStyles[a]);
+    btn.textContent = actionNames[a];
+    btn.onclick = () => checkAnswer(a, btn);
+    actionsDiv.appendChild(btn);
+  });
+
+  document.getElementById('quiz-feedback').textContent = '';
+  document.getElementById('quiz-feedback').className = 'quiz-feedback';
+
+  // Update score display
+  updateQuizScore();
+}
+
+function checkAnswer(answer, clickedBtn) {
+  if (quizAnswered) return;
+  quizAnswered = true;
+  quizTotal++;
+
+  const isCorrect = answer === quizCurrentAnswer;
+  if (isCorrect) quizCorrect++;
+
+  const feedback = document.getElementById('quiz-feedback');
+  const allBtns = document.querySelectorAll('.quiz-action-btn');
+
+  allBtns.forEach(b => b.disabled = true);
+
+  // Highlight correct and wrong
+  allBtns.forEach(b => {
+    const bAction = b.textContent.match(/\(([^)]+)\)/)?.[1];
+    if (bAction === quizCurrentAnswer) {
+      b.classList.add('correct-answer');
+    }
+  });
+
+  if (isCorrect) {
+    feedback.textContent = '✓ ¡Correcto!';
+    feedback.className = 'quiz-feedback correct';
+  } else {
+    clickedBtn.classList.add('wrong-answer');
+    feedback.textContent = `✗ Incorrecto — la respuesta correcta es: ${ACTION_LABELS[quizCurrentAnswer]}`;
+    feedback.className = 'quiz-feedback wrong';
+  }
+
+  updateQuizScore();
+}
+
+function updateQuizScore() {
+  document.getElementById('quiz-correct').textContent = quizCorrect;
+  document.getElementById('quiz-total').textContent   = quizTotal;
+  document.getElementById('quiz-pct').textContent =
+    quizTotal > 0 ? Math.round((quizCorrect / quizTotal) * 100) + '%' : '—';
+}
+
+/* ══════════════════════════════════════════
+   TAB SWITCHING
+══════════════════════════════════════════ */
+
+function switchTab(tab) {
+  document.getElementById('counter-section').style.display  = tab === 'counter'  ? 'grid'  : 'none';
+  document.getElementById('strategy-section').style.display = tab === 'strategy' ? 'block' : 'none';
+  document.getElementById('guide-section').style.display    = tab === 'guide'    ? 'flex'  : 'none';
+  document.getElementById('tab-counter').classList.toggle('active',  tab === 'counter');
+  document.getElementById('tab-strategy').classList.toggle('active', tab === 'strategy');
+  document.getElementById('tab-guide').classList.toggle('active',    tab === 'guide');
+}
+
+/* ══════════════════════════════════════════
+   INIT
+══════════════════════════════════════════ */
+initDeck();
+buildTable();
+</script>
+</body>
+</html>
